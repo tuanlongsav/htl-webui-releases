@@ -7,6 +7,57 @@ máy chủ riêng.
 
 Repo này chỉ chứa **bản phát hành đã ký** và **script cài đặt**.
 
+![Tổng quan — giao diện tối](screenshots/dashboard-dark.png)
+
+<table>
+<tr>
+<td width="30%"><img src="screenshots/mobile-dashboard.png" alt="Tổng quan trên điện thoại"></td>
+<td><img src="screenshots/dashboard-light.png" alt="Tổng quan — giao diện sáng"></td>
+</tr>
+<tr>
+<td align="center">Điện thoại</td>
+<td align="center">Giao diện sáng (tự theo cài đặt của máy)</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td><img src="screenshots/connection.png" alt="Kết nối: quét và khoá cell, khoá băng tần"></td>
+<td><img src="screenshots/watchdog.png" alt="Watchdog"></td>
+</tr>
+<tr>
+<td align="center">Kết nối: quét cell, khoá cell/băng tần</td>
+<td align="center">Watchdog: ping, độ trễ, thang khôi phục</td>
+</tr>
+<tr>
+<td><img src="screenshots/usage.png" alt="Lưu lượng"></td>
+<td><img src="screenshots/system.png" alt="Hệ thống"></td>
+</tr>
+<tr>
+<td align="center">Lưu lượng: tháng, 30 ngày, hạn mức</td>
+<td align="center">Hệ thống: cập nhật, bộ nhớ, chẩn đoán</td>
+</tr>
+</table>
+
+<sub>Ảnh chụp từ dữ liệu mô phỏng, không phải từ card thật.</sub>
+
+## Chức năng
+
+| Trang | Làm được gì |
+|---|---|
+| **Tổng quan** | Nhà mạng, RAT, từng sóng mang CA (băng, độ rộng, RSRP riêng); RSRP/SINR/RSRQ/RSSI vẽ thành sóng và vạch, RSRP của 4 ăng-ten RX; biểu đồ 60 phút tín hiệu + nhiệt độ kèm dải SINR và RAT; ping, lưu lượng phiên, tốc độ đang chạy, nhiệt độ/CPU/RAM; cell đang phục vụ và anchor LTE (NSA); SIM, IMEI. Thẻ màu đổi theo chất lượng sóng; kéo thả để sắp xếp. |
+| **Kết nối** | Quét cell lân cận; khoá cell LTE/NR (chọn từ kết quả quét hoặc nhập tay); khoá băng tần LTE, NR NSA, NR SA (có preset VN); chế độ mạng và thứ tự ưu tiên RAT; **tự khoá cell** khi tín hiệu đạt ngưỡng, tự nhả khi tụt. |
+| **APN** | Sửa 6 cấu hình PDP (APN, loại IP, xác thực), bật/tắt từng CID, preset nhà mạng. |
+| **SMS** | Đọc, gửi, xoá tin; hiển thị đúng tiếng Việt (UCS-2) và tin từ số ngắn; tra tài khoản bằng USSD (`*101#`…). |
+| **Lưu lượng** | Tháng này, hôm nay, phiên hiện tại; biểu đồ 30 ngày tải xuống/lên; ngày chốt cước, hạn mức tháng; kiểm tra bộ đếm modem có bị đảo RX/TX không. |
+| **Watchdog** | Ping liên tục, mất gói, RTT P95, phân bố độ trễ. Mất mạng thì khôi phục theo bậc: đăng ký lại mạng → khởi động lại radio → reboot card (giới hạn số lần/giờ). Nhận biết SIM bị nhà mạng từ chối để không reboot vô ích; tự nhường khi bạn đang thao tác tay; tạm dừng được. |
+| **Mạng LAN/WAN** | IP LAN (gateway) của card, DNS tuỳ chỉnh cho máy trong LAN, TTL/Hop Limit, IP Passthrough (Ethernet/USB). |
+| **Lệnh AT** | Bảng lệnh gửi thẳng tới modem (tắt sẵn, bật khi cần; mọi lệnh ghi vào log), danh sách lệnh thường dùng theo nhóm kèm giải thích tham số. |
+| **Hệ thống** | Cập nhật OTA từ repo này (kiểm chữ ký, tự quay về bản cũ nếu bản mới không chạy), tự cập nhật theo giờ, cài từ file `.htlpkg` khi card không ra Internet; RAM, zram và dọn tệp thừa trong `/tmp`; tải gói chẩn đoán (đã che IMSI/ICCID/IMEI/số điện thoại); khởi động lại card hoặc agent; đổi mật khẩu (dùng chung cho SSH). |
+
+Tiếng Việt/English, giao diện sáng/tối, dùng tốt trên điện thoại. Toàn bộ giao diện khoảng 72 KB
+(nén), chạy ngay trên card cùng một agent viết bằng Rust — không cần máy chủ hay dịch vụ đám mây.
+
 ### Card nào cài được
 
 | Model | |
