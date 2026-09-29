@@ -51,6 +51,9 @@ MCowBQYDK2VwAyEAMf3M9uio1LWhWdn1D3+AfhciR643IMc3lgxSfOyUJAc=
 PATH="${HTL_TEST_PATH:+$HTL_TEST_PATH:}$OPT/bin:$OPT/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
 export PATH
 unset LD_LIBRARY_PATH LD_PRELOAD
+# `adb shell` runs with umask 000: Entware, its package lists and the units
+# made here, and everything install.sh makes, would be writable by everyone.
+umask 022
 
 usage() { echo "usage: sh bootstrap.sh [--channel stable|beta] [--dry-run] [--force]"; exit 2; }
 CHANNEL=stable DRY=0 FORCE=0 FG=0
