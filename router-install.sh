@@ -23,6 +23,7 @@
 RAW=https://raw.githubusercontent.com/tuanlongsav/htl-webui-releases/main
 CARD_SCRIPT=/tmp/htl-bootstrap.sh
 CARD_LOG=/tmp/htl-bootstrap.log
+CARD_ROOT=/usrdata/htlwebui
 SYSFS=${HTL_TEST_SYSFS:-/sys/bus/usb/devices}
 QUECTEL_VID=2c7c
 WAIT_POLLS=${HTL_TEST_WAIT_POLLS:-360}   # x 5 s = 30 min for a card adb lost
@@ -152,7 +153,13 @@ case "$_res" in
     *"dry run"*) info "dry run: nothing was changed" ;;
     *)
         info "Web UI: https://${_ip:-<the card IP>}/ — from a device on this router's network"
-        info "first login: admin / admin, then set your own password"
+        # install.sh leaves this marker only while the password is still "admin".
+        if $A shell "[ -f $CARD_ROOT/etc/web/passwd.must_change ] && echo must_change" 2>/dev/null \
+            | grep -q must_change; then
+            info "first login: password admin — the Web UI then asks for your own"
+        else
+            info "login: the password already set on this card (kept)"
+        fi
         info "the browser warns about the certificate (made on the card): continue anyway"
         info "iPhone (iOS 27): turn Wi-Fi \"Connection Assist\" off for the first visit"
         info "later updates: the Update card of the Web UI"
