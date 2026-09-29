@@ -2,14 +2,30 @@
 
 Giao diện web cho card 5G **Quectel RM520N** (dòng RM5xx, firmware Quectel gốc): tín hiệu vẽ
 thành hình, khoá band/cell, tự động khoá cell, APN, SMS, lưu lượng, watchdog tự khôi phục kết
-nối, cập nhật OTA có ký số. Chạy ngay trên card, không cần máy chủ riêng.
+nối, quản lý bộ nhớ, đổi IP LAN của card, cập nhật OTA có ký số. Chạy ngay trên card, không cần
+máy chủ riêng.
 
 Repo này chỉ chứa **bản phát hành đã ký** và **script cài đặt**.
 
+### Card nào cài được
+
+| Model | |
+|---|---|
+| RM520N, RM521F, RM530N (SDX6x) | cài được; RM520N-GL đã chạy thật |
+| RM500Q, RM502Q, RM505Q, RM510Q (SDX55) | cài kèm cảnh báo: cùng hệ điều hành, **chưa thử trên phần cứng** |
+| RM551E, RM500U | không hỗ trợ (hệ điều hành khác) |
+| model khác | dừng; thêm `--any-model` nếu vẫn muốn cài |
+
 ## Cài đặt
 
-Cần: card RM520N đã có mạng (data call lên), cắm USB **có bật ADB**, còn khoảng 40 MB trống ở
-`/usrdata`. Chọn một trong ba cách, tuỳ card đang cắm vào đâu:
+Cần: card đã có mạng (data call lên), cắm USB **có bật ADB**, còn khoảng 40 MB trống ở
+`/usrdata`. Chọn một cách, tuỳ card đang cắm vào đâu:
+
+### Router có ứng dụng Rowa
+
+Trong ứng dụng: **Cài đặt → Web UI của card 5G → Cài** (hoặc từ thẻ 5G). Rowa chạy đúng
+`router-install.sh` ở Cách 1 và hiện tiến độ; cập nhật, quay về bản cũ, kênh và giờ tự cập nhật
+cũng làm được ở đó.
 
 ### Cách 1 — Card cắm vào router OpenWrt (khuyên dùng)
 
@@ -44,8 +60,16 @@ curl -fsSL -o /tmp/b.sh https://raw.githubusercontent.com/tuanlongsav/htl-webui-
 | `--dry-run` | chỉ kiểm tra (card, mạng, chữ ký bản phát hành), không cài gì |
 | `--force` | cài lại dù card đã có bản này hoặc mới hơn |
 | `--channel beta` | lấy bản thử nghiệm thay vì bản ổn định |
+| `--lan-ip 192.168.50.1` | đặt IP LAN (gateway) của card khi cài; bỏ trống thì giữ nguyên. Đổi về sau: trang Mạng LAN/WAN |
+| `--any-model` | cài trên model không có trong bảng ở trên |
+| `--status` | chỉ xem: card, bản đang cài, trạng thái Web UI |
+| `--uninstall [--keep-data]` | gỡ cài đặt (xem bên dưới) |
+| `--serial S` (chỉ Cách 1) | chọn card khi router thấy nhiều thiết bị adb |
 
 Cách 1: `wget -qO- …/router-install.sh | sh -s -- --dry-run`. Cách 2 và 3: `sh /tmp/b.sh --dry-run`.
+
+Dòng cuối luôn dành cho chương trình: `HTL-INSTALL: OK code=… url=…` hoặc
+`HTL-INSTALL: FAILED code=… — lý do` (Cách 1), `HTL-BOOTSTRAP: …` (Cách 2, 3).
 
 ### Script làm gì trên card
 
@@ -74,16 +98,15 @@ Rớt adb/ssh giữa chừng không làm hỏng: cài đặt chạy tiếp trên
 
 ## Gỡ cài đặt
 
-Chạy trong shell của card (`adb shell`, từ router hoặc máy tính):
+Cùng lệnh cài, thêm `--uninstall`:
 
 ```sh
-mkdir -p /tmp/htl-un && tar xzf /usrdata/htlwebui/var/update/installed.tar.gz -C /tmp/htl-un \
-    && sh /tmp/htl-un/*/uninstall.sh; rm -rf /tmp/htl-un
+wget -qO- https://raw.githubusercontent.com/tuanlongsav/htl-webui-releases/main/router-install.sh | sh -s -- --uninstall
 ```
 
-Gỡ dịch vụ, sudoers, luật TTL/HL, khối DNS tuỳ chỉnh và toàn bộ `/usrdata/htlwebui`. Thêm
-`--keep-data` sau `uninstall.sh` để giữ cấu hình, mật khẩu, chứng chỉ và bộ đếm lưu lượng cho lần
-cài lại.
+(Cách 2 và 3: `sh /tmp/b.sh --uninstall`.) Gỡ dịch vụ, sudoers, luật TTL/HL, khối DNS tuỳ chỉnh,
+rule udev và toàn bộ `/usrdata/htlwebui`. Thêm `--keep-data` để giữ cấu hình, mật khẩu, chứng chỉ
+và bộ đếm lưu lượng cho lần cài lại. IP LAN của card giữ nguyên như lúc gỡ.
 
 Entware vẫn ở lại. Muốn gỡ luôn (chỉ khi không còn gì khác trên card dùng `/opt`, ví dụ QManager):
 
