@@ -72,6 +72,29 @@ Rớt adb/ssh giữa chừng không làm hỏng: cài đặt chạy tiếp trên
 - Cập nhật về sau: thẻ **Cập nhật phần mềm** ở trang Hệ thống — tự kiểm chữ ký, tự quay về bản
   cũ nếu bản mới không chạy.
 
+## Gỡ cài đặt
+
+Chạy trong shell của card (`adb shell`, từ router hoặc máy tính):
+
+```sh
+mkdir -p /tmp/htl-un && tar xzf /usrdata/htlwebui/var/update/installed.tar.gz -C /tmp/htl-un \
+    && sh /tmp/htl-un/*/uninstall.sh; rm -rf /tmp/htl-un
+```
+
+Gỡ dịch vụ, sudoers, luật TTL/HL, khối DNS tuỳ chỉnh và toàn bộ `/usrdata/htlwebui`. Thêm
+`--keep-data` sau `uninstall.sh` để giữ cấu hình, mật khẩu, chứng chỉ và bộ đếm lưu lượng cho lần
+cài lại.
+
+Entware vẫn ở lại. Muốn gỡ luôn (chỉ khi không còn gì khác trên card dùng `/opt`, ví dụ QManager):
+
+```sh
+mount -o remount,rw /
+systemctl disable start-opt-mount.service; systemctl stop start-opt-mount.service opt.mount
+rm -f /lib/systemd/system/opt.mount /lib/systemd/system/start-opt-mount.service
+systemctl daemon-reload; rmdir /opt; sync; mount -o remount,ro /
+rm -rf /usrdata/opt
+```
+
 ## Nội dung mỗi bản phát hành
 
 | File | Là gì |
