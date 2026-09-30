@@ -18,6 +18,9 @@
 # Options:
 #   --dry-run            change nothing, on the router or the card
 #   --force              install the same or an older build again
+#   --fresh              HTL already on the card: remove it and all its data,
+#                        then install from scratch (default: an upgrade that
+#                        keeps settings, password, certificate, counters)
 #   --channel stable|beta
 #   --any-model          a card model HTL does not know (see bootstrap.sh)
 #   --lan-ip A.B.C.D     the card's LAN gateway address (default: kept)
@@ -58,7 +61,7 @@ PM_LOCK=${HTL_TEST_PM_LOCK:-/var/run/rowa-install.lock}
 RLOG=${HTL_TEST_RLOG:-/tmp/htl-router-install.log}
 
 usage() {
-    echo "usage: router-install.sh [--dry-run] [--force] [--channel stable|beta] [--any-model] [--lan-ip A.B.C.D]"
+    echo "usage: router-install.sh [--dry-run] [--force] [--fresh] [--channel stable|beta] [--any-model] [--lan-ip A.B.C.D]"
     echo "                         [--status | --uninstall [--keep-data]] [--detach] [--serial S] [--local FILE]"
     exit 2
 }
@@ -75,7 +78,7 @@ info() { printf '  + %s\n' "$1"; }
 die()  { printf '  x %s\n\nHTL-INSTALL: FAILED code=%s — %s\n' "$2" "$1" "$2"; exit 1; }
 ok()   { printf '\nHTL-INSTALL: OK code=%s\n' "$*"; exit 0; }
 
-ARGS="" LOCAL="" SERIAL="" MODE=install DRY=0 DETACH=0 KEEP=0 ALL="$*"
+ARGS="" LOCAL="" SERIAL="" MODE=install DRY=0 DETACH=0 KEEP=0 FRESH=0 ALL="$*"
 while [ $# -gt 0 ]; do
     case "$1" in
         --channel)
@@ -84,6 +87,7 @@ while [ $# -gt 0 ]; do
             shift ;;
         --dry-run)   DRY=1; ARGS="$ARGS --dry-run" ;;
         --force|--any-model) ARGS="$ARGS $1" ;;
+        --fresh)     FRESH=1; ARGS="$ARGS --fresh" ;;
         --lan-ip)
             [ $# -ge 2 ] || usage
             # checked again on the card; here it only has to be harmless
@@ -100,6 +104,7 @@ while [ $# -gt 0 ]; do
     shift
 done
 [ "$KEEP" = 0 ] || [ "$MODE" = uninstall ] || usage
+[ "$FRESH" = 0 ] || [ "$MODE" = install ] || usage
 case "$SERIAL" in *[!A-Za-z0-9._:-]*) die bad_serial "not an adb serial: $SERIAL" ;; esac
 
 # --- detach: the session may drop, the install must not -------------------------
