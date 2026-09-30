@@ -27,7 +27,7 @@ Repo này chỉ chứa **bản phát hành đã ký** và **script cài đặt**
 </tr>
 <tr>
 <td align="center">Kết nối: quét cell, khoá cell/băng tần</td>
-<td align="center">Watchdog: ping, độ trễ, thang khôi phục</td>
+<td align="center">Watchdog: ping, độ trễ, thang khôi phục, nhật ký sự cố</td>
 </tr>
 <tr>
 <td><img src="screenshots/usage.png" alt="Lưu lượng"></td>
@@ -50,7 +50,7 @@ Repo này chỉ chứa **bản phát hành đã ký** và **script cài đặt**
 | **APN** | Sửa 6 cấu hình PDP (APN, loại IP, xác thực), bật/tắt từng CID, preset nhà mạng. |
 | **SMS** | Đọc, gửi, xoá tin; hiển thị đúng tiếng Việt (UCS-2) và tin từ số ngắn; tra tài khoản bằng USSD (`*101#`…). |
 | **Lưu lượng** | Tháng này, hôm nay, phiên hiện tại; biểu đồ 30 ngày tải xuống/lên; ngày chốt cước, hạn mức tháng; kiểm tra bộ đếm modem có bị đảo RX/TX không. |
-| **Watchdog** | Ping liên tục, mất gói, RTT P95, phân bố độ trễ. Mất mạng thì khôi phục theo bậc: đăng ký lại mạng → khởi động lại radio → reboot card (giới hạn số lần/giờ). Nhận biết SIM bị nhà mạng từ chối để không reboot vô ích; tự nhường khi bạn đang thao tác tay; tạm dừng được. |
+| **Watchdog** | Ping liên tục, mất gói, RTT P95, phân bố độ trễ. Mất mạng thì khôi phục theo bậc: đăng ký lại mạng → khởi động lại radio → reboot card (giới hạn số lần/giờ). Nhận biết SIM bị nhà mạng từ chối để không reboot vô ích; tự kéo card về 4G/5G khi bị kẹt ở 3G; tự nhả khoá cell của autolock khi mất mạng trên cell đó; tự nhường khi bạn đang thao tác tay; tạm dừng được. **Nhật ký sự cố** (mất/có mạng, xuống 3G, mỗi lần khôi phục) lưu trên card, còn nguyên sau reboot. |
 | **Mạng LAN/WAN** | IP LAN (gateway) của card, DNS tuỳ chỉnh cho máy trong LAN, TTL/Hop Limit, IP Passthrough (Ethernet/USB). |
 | **Lệnh AT** | Bảng lệnh gửi thẳng tới modem (tắt sẵn, bật khi cần; mọi lệnh ghi vào log), danh sách lệnh thường dùng theo nhóm kèm giải thích tham số. |
 | **Hệ thống** | Cập nhật OTA từ repo này (kiểm chữ ký, tự quay về bản cũ nếu bản mới không chạy), tự cập nhật theo giờ, cài từ file `.htlpkg` khi card không ra Internet; RAM, zram và dọn tệp thừa trong `/tmp`; tải gói chẩn đoán (đã che IMSI/ICCID/IMEI/số điện thoại); khởi động lại card hoặc agent; đổi mật khẩu (dùng chung cho SSH). |
