@@ -4,7 +4,7 @@
 # signed releases, starting from a freshly flashed firmware. Runs ON THE CARD
 # as root (adb shell / ssh); router-install.sh brings it there from a router.
 #
-#   sh bootstrap.sh [--channel stable|beta] [--dry-run] [--force]
+#   sh bootstrap.sh [--channel stable|beta] [--dry-run] [--force] [--fresh]
 #                   [--any-model] [--lan-ip A.B.C.D]
 #   sh bootstrap.sh --status                 what is there; changes nothing
 #   sh bootstrap.sh --uninstall [--keep-data]
@@ -24,12 +24,19 @@
 #    the release key's ed25519 signature (the key is below, the one the cards
 #    trust), the package its signed sha256 and size
 # 5. install.sh of that package (--lan-ip passed on: the card's LAN gateway,
-#    its DHCP range kept, the certificate made for it)
+#    its DHCP range kept, the certificate made for it). Another web UI on the
+#    card (QManager, the toolkit's SimpleAdmin, a lighttpd.service) is taken
+#    off first by the package's wipe-other.sh — they hold the ports HTL's
+#    lighttpd needs; Entware stays. The checks name what will go.
+#
+# On a card HTL is already on: without options, an upgrade (settings,
+# password, certificate and counters kept); --fresh removes it all with the
+# package's uninstall.sh and installs from scratch (implies --force).
 #
 # Run from a file it detaches itself (setsid nohup) and follows its own log,
 # /tmp/htl-bootstrap.log: a dropped adb/ssh session does not stop it half-way.
 # --dry-run stops before changing anything; --force installs the same or an
-# older build again. One run at a time (/tmp/htl-bootstrap.lock).
+# older build again; --fresh wipes HTL's install and data first. One run at a time (/tmp/htl-bootstrap.lock).
 #
 # The last line is for programs (router-install.sh, the Rowa app) — adb
 # shell does not pass exit codes on:
@@ -37,7 +44,8 @@
 #   HTL-BOOTSTRAP: FAILED code=<code> — <what went wrong, for people>
 # k=v: build (installed build or none), model, lan (the card's LAN address),
 # password (admin: the default, still to be changed; kept; none), webui
-# (up/down/none). Codes are listed in docs/DEPLOY.md.
+# (up/down/none); --status adds other (the other web UIs, comma-joined, or
+# none). Codes are listed in docs/DEPLOY.md.
 #
 # HTL_TEST_* variables are for tests/sh/test-bootstrap.sh only.
 # =============================================================================
@@ -49,6 +57,7 @@ ENTWARE_URL=https://bin.entware.net/armv7sf-k3.2/installer
 # opkg for the lighttpd modules it loads and fails on a missing hard one.
 PACKAGES="lighttpd lighttpd-mod-cgi lighttpd-mod-openssl sudo jq openssl-util curl ca-bundle"
 ROOT=${HTL_TEST_ROOT:-/usrdata/htlwebui}
+WR=${HTL_TEST_CARD:-}
 OPT=${HTL_TEST_OPT:-/opt}
 USRDATA=${HTL_TEST_USRDATA:-/usrdata}
 SYSD=${HTL_TEST_SYSD:-/lib/systemd/system}
@@ -83,17 +92,18 @@ lan_ip_ok() {
 }
 
 usage() {
-    echo "usage: sh bootstrap.sh [--channel stable|beta] [--dry-run] [--force] [--any-model] [--lan-ip A.B.C.D]"
+    echo "usage: sh bootstrap.sh [--channel stable|beta] [--dry-run] [--force] [--fresh] [--any-model] [--lan-ip A.B.C.D]"
     echo "       sh bootstrap.sh --status | --uninstall [--keep-data]"
     exit 2
 }
-CHANNEL=stable DRY=0 FORCE=0 FG=0 ANY=0 LANIP="" MODE=install KEEP=0
+CHANNEL=stable DRY=0 FORCE=0 FRESH=0 FG=0 ANY=0 LANIP="" MODE=install KEEP=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --channel)    [ $# -ge 2 ] || usage; CHANNEL=$2; shift ;;
         --channel=*)  CHANNEL=${1#--channel=} ;;
         --dry-run)    DRY=1 ;;
         --force)      FORCE=1 ;;
+        --fresh)      FRESH=1 FORCE=1 ;;
         --any-model)  ANY=1 ;;
         --lan-ip)     [ $# -ge 2 ] || usage; LANIP=$2; shift ;;
         --status)     MODE=status ;;
@@ -110,6 +120,7 @@ case "$CHANNEL" in stable|beta) ;; *) usage ;; esac
     usage
 }
 [ "$KEEP" = 0 ] || [ "$MODE" = uninstall ] || usage
+[ "$FRESH" = 0 ] || [ "$MODE" = install ] || usage
 LOCK=${HTL_TEST_LOCK:-/tmp/htl-bootstrap.lock}
 
 # lock_busy — another bootstrap run holds the lock and is alive
@@ -128,6 +139,7 @@ if [ "$FG" = 0 ] && [ "$MODE" != status ] && [ -f "$0" ] && [ -z "${HTL_TEST_NOD
     _args=""
     [ "$DRY" = 1 ] && _args="$_args --dry-run"
     [ "$FORCE" = 1 ] && _args="$_args --force"
+    [ "$FRESH" = 1 ] && _args="$_args --fresh"
     [ "$ANY" = 1 ] && _args="$_args --any-model"
     [ -n "$LANIP" ] && _args="$_args --lan-ip $LANIP"
     [ "$MODE" = uninstall ] && _args="$_args --uninstall"
@@ -278,6 +290,24 @@ model_class() {
 # ---------------------------------------------------------------------------
 
 # facts — k=v of what the card has now, the tail of every OK line
+# other_webuis — the web UIs on this card, one name per line. The same in
+# bootstrap.sh (tests/sh/test-wipe-other.sh keeps the two identical).
+other_webuis() {
+    if [ -d "$WR/usr/lib/qmanager" ] || [ -d "$WR/usrdata/qmanager" ] || [ -d "$WR/etc/qmanager" ] \
+        || [ -n "$(ls "$WR"/lib/systemd/system/qmanager-* 2>/dev/null)" ]; then
+        echo qmanager
+    fi
+    if [ -d "$WR/usrdata/simpleadmin" ] || [ -d "$WR/usrdata/simplefirewall" ] \
+        || [ -d "$WR/usrdata/socat-at-bridge" ] \
+        || grep -qs '/usrdata/simpleadmin' "$WR/lib/systemd/system/lighttpd.service"; then
+        echo simpleadmin
+    fi
+    if [ -e "$WR/lib/systemd/system/lighttpd.service" ] \
+        && ! grep -qs -e /usrdata/qmanager -e /usrdata/simpleadmin "$WR/lib/systemd/system/lighttpd.service"; then
+        echo lighttpd
+    fi
+}
+
 facts() {
     _fb=$(head -n 1 "$ROOT/VERSION" 2>/dev/null | tr -d ' \r')
     _fl=$(ip -4 addr show bridge0 2>/dev/null | awk '$1 == "inet" { sub(/\/.*/, "", $2); print $2; exit }')
@@ -293,7 +323,8 @@ facts() {
 MODEL=$(card_model)
 if [ "$MODE" = status ]; then
     if [ -x "$OPT/bin/opkg" ]; then _e=yes; else _e=no; fi
-    done_ok "status $(facts) entware=$_e"
+    _ow=$(other_webuis | tr '\n' ',' | sed 's/,$//')
+    done_ok "status $(facts) entware=$_e other=${_ow:-none}"
 fi
 
 step "Checks"
@@ -343,6 +374,12 @@ _free=$(df -k "$USRDATA" 2>/dev/null | awk 'NR > 1 && NF >= 3 { v = $(NF-2) } EN
 case "$_free" in ''|*[!0-9]*) _free=0 ;; esac
 [ "$_free" -ge "$MIN_FREE_KB" ] || fail no_space "/usrdata has ${_free} KB free, ${MIN_FREE_KB} needed"
 info "/usrdata: ${_free} KB free"
+OTHERS=$(other_webuis | tr '\n' ' ')
+if [ -n "$OTHERS" ] && [ "$DRY" = 1 ]; then
+    warn "another web UI on the card: ${OTHERS% } — an install would remove it first (Entware stays)"
+elif [ -n "$OTHERS" ]; then
+    warn "another web UI on the card: ${OTHERS% } — it is removed before HTL goes on (Entware stays)"
+fi
 W=$(mktemp -d /tmp/htl-bootstrap.XXXXXX) || fail no_space "no scratch space in /tmp"
 fetch "$BASE/channels/channels.json.sig" "$W/probe" 1024 30
 case $? in
@@ -466,7 +503,11 @@ if [ -n "$CUR" ] && [ "$FORCE" = 0 ] && [ "$(ver_cmp "$REL_ID" "$CUR")" != 1 ]; 
     info "later updates: the Update card of the Web UI"
     done_ok "already $(facts)"
 fi
-[ -n "$CUR" ] && info "installed: $CUR — will install $REL_ID"
+if [ -n "$CUR" ] && [ "$FRESH" = 1 ]; then
+    info "installed: $CUR — --fresh: it and all its data go, then $REL_ID from scratch"
+elif [ -n "$CUR" ]; then
+    info "installed: $CUR — will install $REL_ID"
+fi
 if [ "$DRY" = 1 ]; then
     info "dry run: would download and install $REL_ID"
     done_ok "dry_run $(facts) release=$REL_ID"
@@ -484,5 +525,11 @@ step "Install"
 set --
 [ "$ANY" = 1 ] && set -- "$@" --any-model
 [ -n "$LANIP" ] && set -- "$@" --lan-ip "$LANIP"
+# --fresh: whatever HTL left (an install, or the etc/ var/ of --keep-data)
+if [ "$FRESH" = 1 ] && { [ -n "$CUR" ] || [ -n "$(ls -A "$ROOT" 2>/dev/null)" ]; }; then
+    [ -f "$W/htlwebui-$REL_ID/uninstall.sh" ] || fail package_bad "the package has no uninstall.sh"
+    ( cd "$W/htlwebui-$REL_ID" && sh uninstall.sh ) || fail uninstall_failed "uninstall.sh of $REL_ID failed (see above)"
+    info "the old install and its data removed — installing from scratch"
+fi
 ( cd "$W/htlwebui-$REL_ID" && sh install.sh "$@" ) || fail install_failed "install.sh of $REL_ID failed (see above)"
 done_ok "installed $(facts)"
