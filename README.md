@@ -110,6 +110,7 @@ curl -fsSL -o /tmp/b.sh https://raw.githubusercontent.com/tuanlongsav/htl-webui-
 |---|---|
 | `--dry-run` | chỉ kiểm tra (card, mạng, chữ ký bản phát hành), không cài gì |
 | `--force` | cài lại dù card đã có bản này hoặc mới hơn |
+| `--fresh` | card đã có HTL: xoá sạch bản cài cũ (cả cấu hình, mật khẩu, chứng chỉ, bộ đếm) rồi cài lại từ đầu |
 | `--channel beta` | lấy bản thử nghiệm thay vì bản ổn định |
 | `--lan-ip 192.168.50.1` | đặt IP LAN (gateway) của card khi cài; bỏ trống thì giữ nguyên. Đổi về sau: trang Mạng LAN/WAN |
 | `--any-model` | cài trên model không có trong bảng ở trên |
@@ -130,10 +131,38 @@ Dòng cuối luôn dành cho chương trình: `HTL-INSTALL: OK code=… url=…`
 3. Cài lighttpd, sudo, jq, OpenSSL 3, curl từ Entware.
 4. Tải bản phát hành mới nhất, **kiểm chữ ký ed25519 và sha256 ngay trên card**; sai một byte là
    dừng, không cài.
-5. Chạy `install.sh` của bản đó.
+5. Chạy `install.sh` của bản đó. Nếu card đang có Web UI khác thì gỡ nó trước (xem dưới).
 
 Rớt adb/ssh giữa chừng không làm hỏng: cài đặt chạy tiếp trên card, log ở
 `/tmp/htl-bootstrap.log`. Dòng cuối luôn là `HTL-BOOTSTRAP: OK …` hoặc `HTL-BOOTSTRAP: FAILED …`.
+
+### Card đã có Web UI khác (QManager, Web UI của iamromulan)
+
+Hai Web UI không chạy chung được: cùng giữ cổng 80/443 và cổng AT của modem. Lệnh cài **tự gỡ**
+QManager / QManager-VN, SimpleAdmin của toolkit RGMII (kèm simplefirewall, TTL override, cầu AT
+socat, ttyd) và mọi `lighttpd.service` khác, rồi mới cài HTL.
+
+- **Gỡ kèm:**
+  - rule tường lửa và TTL/HL của chúng;
+  - khối DNS tuỳ chỉnh;
+  - công cụ AT của chúng.
+
+  Khoá cell được bỏ và khoá band trả về mọi band card hỗ trợ.
+- **Giữ lại:**
+  - Entware (HTL dùng tiếp);
+  - SSH (dropbear/sshd), Tailscale, lịch reboot của toolkit;
+  - các cài đặt khác trong modem (IP Passthrough, chế độ USB, APN).
+- `--dry-run` cho biết card đang có gì và sẽ gỡ gì, không đụng vào card.
+- Cập nhật OTA từ trong Web UI không bao giờ gỡ gì.
+
+### Card đã có HTL
+
+Chạy lại lệnh cài là **nâng cấp**: giữ cấu hình, mật khẩu, chứng chỉ, bộ đếm lưu lượng. Muốn
+**cài mới** từ đầu, thêm `--fresh`:
+
+```sh
+wget -qO- https://raw.githubusercontent.com/tuanlongsav/htl-webui-releases/main/router-install.sh | sh -s -- --fresh
+```
 
 ## Sau khi cài
 
@@ -156,7 +185,7 @@ wget -qO- https://raw.githubusercontent.com/tuanlongsav/htl-webui-releases/main/
 ```
 
 (Cách 2 và 3: `sh /tmp/b.sh --uninstall`.) Gỡ dịch vụ, sudoers, luật TTL/HL, khối DNS tuỳ chỉnh,
-rule udev và toàn bộ `/usrdata/htlwebui`. Thêm `--keep-data` để giữ cấu hình, mật khẩu, chứng chỉ
+rule udev, `atcli_smd11` do HTL đặt vào và toàn bộ `/usrdata/htlwebui`. Thêm `--keep-data` để giữ cấu hình, mật khẩu, chứng chỉ
 và bộ đếm lưu lượng cho lần cài lại. IP LAN của card giữ nguyên như lúc gỡ.
 
 Entware vẫn ở lại. Muốn gỡ luôn (chỉ khi không còn gì khác trên card dùng `/opt`, ví dụ QManager):
@@ -164,7 +193,10 @@ Entware vẫn ở lại. Muốn gỡ luôn (chỉ khi không còn gì khác trê
 ```sh
 mount -o remount,rw /
 systemctl disable start-opt-mount.service; systemctl stop start-opt-mount.service opt.mount
-rm -f /lib/systemd/system/opt.mount /lib/systemd/system/start-opt-mount.service
+systemctl stop rc.unslung.service 2>/dev/null   # Entware do QManager / toolkit cài
+rm -f /lib/systemd/system/opt.mount /lib/systemd/system/start-opt-mount.service \
+      /lib/systemd/system/rc.unslung.service /lib/systemd/system/multi-user.target.wants/start-opt-mount.service \
+      /lib/systemd/system/multi-user.target.wants/rc.unslung.service
 systemctl daemon-reload; rmdir /opt; sync; mount -o remount,ro /
 rm -rf /usrdata/opt
 ```
