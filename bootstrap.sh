@@ -35,6 +35,8 @@
 #
 # Run from a file it detaches itself (setsid nohup) and follows its own log,
 # /tmp/htl-bootstrap.log: a dropped adb/ssh session does not stop it half-way.
+# The same or a newer build already there is left alone (code=already) — unless
+# its web server is not running, then the release is installed over it.
 # --dry-run stops before changing anything; --force installs the same or an
 # older build again; --fresh wipes HTL's install and data first. One run at a time (/tmp/htl-bootstrap.lock).
 #
@@ -498,13 +500,22 @@ case "$REL_SIZE" in ''|*[!0-9]*) fail signature "release.json has no size" ;; es
 info "$TAG = build $REL_ID, signature good"
 
 CUR=$(head -n 1 "$ROOT/VERSION" 2>/dev/null | tr -d ' \r')
+# "already" is only said of an install that runs: one whose web server is down
+# (01/10: units never installed, the card lost power half-way) is installed
+# again, which is what puts it right.
+REPAIR=0
 if [ -n "$CUR" ] && [ "$FORCE" = 0 ] && [ "$(ver_cmp "$REL_ID" "$CUR")" != 1 ]; then
-    info "installed: $CUR — $TAG is not newer, nothing to do (--force installs it again)"
-    info "later updates: the Update card of the Web UI"
-    done_ok "already $(facts)"
+    if systemctl is-active htl-httpd >/dev/null 2>&1; then
+        info "installed: $CUR — $TAG is not newer, nothing to do (--force installs it again)"
+        info "later updates: the Update card of the Web UI"
+        done_ok "already $(facts)"
+    fi
+    REPAIR=1
 fi
 if [ -n "$CUR" ] && [ "$FRESH" = 1 ]; then
     info "installed: $CUR — --fresh: it and all its data go, then $REL_ID from scratch"
+elif [ "$REPAIR" = 1 ]; then
+    info "installed: $CUR — but its Web UI is not running: will install $REL_ID over it (settings kept)"
 elif [ -n "$CUR" ]; then
     info "installed: $CUR — will install $REL_ID"
 fi
